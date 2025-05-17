@@ -1,69 +1,37 @@
+# Stage 1: Распаковка ядра Bitrix
+FROM alpine:3.18 AS bitrix-core-unpack
+
+WORKDIR /bitrix-core
+
+COPY ./bitrix-core/*.tar.gz /bitrix-core/bitrix-core.tar.gz
+RUN tar -xzvf bitrix-core.tar.gz && rm bitrix-core.tar.gz
+
+# Stage 2: Финальный образ с PHP и Apache
 FROM php:8.4-apache
 
-# Установка системных зависимостей
+# Установка зависимостей, расширений PHP, PECL, настройка Apache, установка прав и очистка кэша в одном RUN
 RUN apt-get update && apt-get install -y \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    libzip-dev \
-    libbz2-dev \
-    libxml2-dev \
-    libonig-dev \
-    libicu-dev \
-    libmemcached-dev \
-    libpspell-dev \
-    libldap2-dev \
-    libgeoip-dev \
-    librrd-dev \
-    libssl-dev \
-    libcurl4-openssl-dev \
-    libgettextpo-dev \
-    libsasl2-dev \
-    libc-client2007e-dev \
-    libkrb5-dev \
-    unzip \
-    wget \
+    libpng-dev libjpeg-dev libfreetype6-dev libzip-dev libbz2-dev libxml2-dev \
+    libonig-dev libicu-dev libmemcached-dev libpspell-dev libldap2-dev \
+    libgeoip-dev librrd-dev libssl-dev libcurl4-openssl-dev libgettextpo-dev \
+    libsasl2-dev libc-client2007e-dev libkrb5-dev unzip wget cron supervisor \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install gd bz2 calendar curl exif fileinfo gettext iconv intl mbstring mysqli opcache pdo pdo_mysql soap sockets zip xml bcmath pcntl \
+    && pecl channel-update pecl.php.net \
+    && pecl install apcu rrd \
+    && docker-php-ext-enable apcu rrd \
+    && a2enmod rewrite \
     && rm -rf /var/lib/apt/lists/*
 
-# Установка PHP-расширений
-RUN docker-php-ext-install gd \
-        bz2 \
-        calendar \
-        curl \
-        exif \
-        fileinfo \
-        gettext \
-        iconv \
-        intl \
-        mbstring \
-        mysqli \
-        opcache \
-        pdo \
-        pdo_mysql \
-        soap \
-        sockets \
-        zip \
-        xml \
-        bcmath \
-        pcntl
-
-# PECL расширения
-RUN pecl channel-update pecl.php.net && \
-    pecl install apcu rrd && \
-    docker-php-ext-enable apcu rrd
-
-# Включение mod_rewrite для Apache
-RUN a2enmod rewrite
-
-# Копируем Composer из официального образа
+# Копируем все необходимые файлы одним COPY
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
+COPY --from=bitrix-core-unpack /bitrix-core /var/www/html/bitrix
+COPY ./docker/bitrix.ini /usr/local/etc/php/conf.d/bitrix.ini
+COPY ./docker/bitrix-crontab /etc/cron.d/bitrix-crontab
+COPY ./docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Копируем ядро Bitrix (только ядро!) в нужное место
-COPY ./bitrix_core/bitrix /var/www/html/bitrix
-
-# Меняем владельца и права на запись для ядра
-RUN chown -R www-data:www-data /var/www/html/bitrix && chmod -R u+w /var/www/html/bitrix
+# Выставляем права на Bitrix и crontab одним RUN
+RUN chown www-data:www-data /var/www/html/bitrix && chmod u+w /var/www/html/bitrix \
+    && chmod 0644 /etc/cron.d/bitrix-crontab
 
 WORKDIR /var/www/html
-
-CMD ["apache2-foreground"]

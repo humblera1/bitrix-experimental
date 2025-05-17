@@ -1,0 +1,1 @@
+* * * * * www-data /usr/local/bin/php -f /var/www/html/bitrix/modules/main/tools/cron_events.php
