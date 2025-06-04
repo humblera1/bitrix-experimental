@@ -44,7 +44,6 @@ COPY ./docker/nginx/nginx-entrypoint.sh /usr/local/bin/nginx-entrypoint.sh
 # Выставляем права на Bitrix и crontab одним RUN
 RUN chown bitrix:bitrix /var/www/html/bitrix && chmod u+w /var/www/html/bitrix \
     && chmod 0644 /etc/cron.d/bitrix-crontab \
-    && chmod +x /usr/local/bin/bitrix-cron-wrapper.sh \
     && chmod +x /usr/local/bin/nginx-entrypoint.sh
 
 WORKDIR /var/www/html
