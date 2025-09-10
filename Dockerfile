@@ -6,8 +6,8 @@ WORKDIR /bitrix-core
 COPY ./bitrix-core/*.tar.gz /bitrix-core/bitrix-core.tar.gz
 RUN tar -xzvf bitrix-core.tar.gz && rm bitrix-core.tar.gz
 
-# Stage 2: Финальный образ с PHP и Apache
-FROM php:8.4-apache
+# Stage 2: Финальный образ с PHP 7.4 и Apache
+FROM php:7.4-apache
 
 # Установка зависимостей, расширений PHP, PECL, настройка Apache, установка прав и очистка кэша в одном RUN
 RUN apt-get update && apt-get install -y \
@@ -15,11 +15,12 @@ RUN apt-get update && apt-get install -y \
     libonig-dev libicu-dev libmemcached-dev libpspell-dev libldap2-dev \
     libgeoip-dev librrd-dev libssl-dev libcurl4-openssl-dev libgettextpo-dev \
     libsasl2-dev libc-client2007e-dev libkrb5-dev unzip wget nginx cron supervisor nano \
-    poppler-utils catdoc \
+    poppler-utils catdoc libreoffice\
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install gd bz2 calendar curl exif fileinfo gettext iconv intl mbstring mysqli opcache pdo pdo_mysql soap sockets zip xml bcmath pcntl \
+    && docker-php-ext-configure imap --with-kerberos --with-imap-ssl \
+    && docker-php-ext-install gd bz2 calendar curl exif fileinfo gettext iconv intl mbstring mysqli opcache pdo pdo_mysql soap sockets zip xml bcmath pcntl imap \
     && pecl channel-update pecl.php.net \
-    && pecl install apcu rrd imap \
+    && pecl install apcu rrd \
     && docker-php-ext-enable apcu rrd \
     && a2enmod rewrite \
     && rm -rf /var/lib/apt/lists/*
@@ -34,9 +35,6 @@ COPY --from=bitrix-core-unpack /bitrix-core /var/www/html/bitrix
 COPY ./docker/php/bitrix.ini /usr/local/etc/php/conf.d/bitrix.ini
 COPY ./docker/cron/bitrix-crontab /etc/cron.d/bitrix-crontab
 COPY ./docker/supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-# Копируем обёртку для cron
-# COPY ./docker/cron/bitrix-cron-wrapper.sh /usr/local/bin/bitrix-cron-wrapper.sh
 
 # Копируем entrypoint.sh для запуска nginx через supervisor
 COPY ./docker/nginx/nginx-entrypoint.sh /usr/local/bin/nginx-entrypoint.sh
